@@ -42,6 +42,8 @@ You will need to unhide the module to remove it normally
 x64  
 > segmentation fault when running lsmod
 
+Edit: Upon writing this and reviewing my files I'm pretty sure I know what's causing this segfault.
+
 arm 
 > register_ftrace_function() faileds with error -22
 # Contributions
