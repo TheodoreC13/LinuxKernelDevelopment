@@ -40,9 +40,8 @@ You will need to unhide the module to remove it normally
 
 # Known Issues
 x64  
-> segmentation fault when running lsmod
+> segmentation fault when running lsmod. This is specifically on getdents64. When I run the code for the module hiding alone I don't have this issue, nor do I have this issue when I only hook kill. 
 
-Edit: Upon writing this and reviewing my files I'm pretty sure I know what's causing this segfault.
 
 arm 
 > register_ftrace_function() faileds with error -22
