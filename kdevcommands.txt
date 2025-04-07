@@ -1,0 +1,7 @@
+sudo dmesg -W : watch kernel messages
+sudo dmesg : full kernel log
+sudo insmod {driver} : insert mod
+sudo rmmod {driver} : remove mod
+sudo lsmod : list kernel mods
+sudo modprobe {driver} : load a kernel mod and all of it's dependencies
+sudo modprobe -r {driver} : unload a kernel mod and all of it's dependencies
