@@ -12,6 +12,6 @@ static void __exit my_exit(void){
 module_init(my_init);
 module_exit(my_exit);
 
-MODULE_AUTHOR("Heapheaus");
+MODULE_AUTHOR("TheodoreC13");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A basic linux kernel driver written for personal development");
