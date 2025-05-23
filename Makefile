@@ -1,3 +1,4 @@
+#obj-m += kprobetest.o
 obj-m += breadboard.o
 #obj-m += showtest.o
 
