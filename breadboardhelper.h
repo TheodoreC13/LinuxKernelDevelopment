@@ -26,7 +26,7 @@ struct ftrace_hook {
 };
 
 static int fh_resolve_hook_address(struct ftrace_hook *hook){
-	// the kallsyms_lookup_name portion of this is used to find the address of kallsyms by dereferecing
+	// the kallsyms_lookup_name portion of this is used to find the address of kallsyms by registering a kprobe at that symbol address and grabbing the address of the kprobe.
 	typedef unsigned long (*kallsyms_lookup_name_t)(const char *name);
 	kallsyms_lookup_name_t kallsyms_lookup_name;
 	register_kprobe(&kp);
@@ -34,7 +34,7 @@ static int fh_resolve_hook_address(struct ftrace_hook *hook){
 	unregister_kprobe(&kp);
 	hook->address = kallsyms_lookup_name(hook->name);
 	if(!hook->address){
-		printk(KERN_INFO "breadboard: unresolved symnbol %s\n", hook->name);
+		printk(KERN_INFO "breadboard: unresolved symbol %s\n", hook->name);
 		return -ENOENT;
 	}
 	*((unsigned long*) hook->original) = hook->address + MCOUNT_INSN_SIZE;
@@ -74,7 +74,7 @@ void fh_remove_hook(struct ftrace_hook *hook){
 	int err;
 	err = unregister_ftrace_function(&hook->ops);
 	if(err){
-		printk(KERN_DEBUG "breadboard: unregistere_ftrace_function() failed: %d\n", err);
+		printk(KERN_DEBUG "breadboard: unregister_ftrace_function() failed: %d\n", err);
 	}
 	err = ftrace_set_filter_ip(&hook->ops, hook->address, 1, 0);
 	if(err){
