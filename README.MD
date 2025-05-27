@@ -34,14 +34,13 @@ Insert the mod into your kernel
 
 You will need to unhide the module to remove it normally
 
-> kill -63 999
+> kill -63 [any number]
 
 > sudo rmmod breadboard
 
 # Known Issues
-x64  
-> segmentation fault when running lsmod. This is specifically on getdents64. When I run the code for the module hiding alone I don't have this issue, nor do I have this issue when I only hook kill. 
-
+x64
+> segfault that was previously here has been fixed. New features will be coming soon
 
 arm 
 > register_ftrace_function() faileds with error -22
